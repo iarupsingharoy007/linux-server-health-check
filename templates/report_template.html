@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }} &middot; {{ company_name }}</title>
+<style>{{ css_content | safe }}</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span>{{ title }}</span>
+  </div>
+  <span class="brand-sub">{{ company_name }}</span>
+
+  <div class="search-wrap">
+    <span class="search-icon">&#128269;</span>
+    <input type="text" id="server-search" placeholder="Search hostname, IP, OS...">
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="expand-all"><span class="icon">&#8645;</span><span class="label">Expand all</span></button>
+    <button class="btn" id="export-csv"><span class="icon">&#8681;</span><span class="label">Export CSV</span></button>
+    <button class="btn" id="export-pdf"><span class="icon">&#128196;</span><span class="label">Export PDF</span></button>
+    <button class="btn" id="print-report"><span class="icon">&#128424;</span><span class="label">Print</span></button>
+    <button class="btn primary" id="theme-toggle"><span class="icon">&#9728;&#65039;</span><span class="label">Light mode</span></button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <header class="page-header">
+    <div>
+      <h1>Fleet Health Overview</h1>
+      <div class="meta">Generated {{ generated_at }} &middot; Overall status:
+        <span class="badge -{{ overall_status }}"><span class="dot"></span>{{ overall_status | upper }}</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="summary-bar">
+    <div class="pulse-track">
+      <svg viewBox="0 0 400 46" preserveAspectRatio="none">
+        <path class="pulse-line -status-{{ overall_status }}"
+              d="M0,23 L40,23 L52,23 L60,6 L68,40 L76,23 L90,23 L400,23
+                 L440,23 L452,23 L460,6 L468,40 L476,23 L490,23 L800,23" />
+      </svg>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card -info">
+        <div class="label">Total Servers</div>
+        <div class="value">{{ summary.total }}</div>
+      </div>
+      <div class="summary-card -healthy">
+        <div class="label">Healthy</div>
+        <div class="value">{{ summary.healthy }}</div>
+      </div>
+      <div class="summary-card -warning">
+        <div class="label">Warning</div>
+        <div class="value">{{ summary.warning }}</div>
+      </div>
+      <div class="summary-card -critical">
+        <div class="label">Critical</div>
+        <div class="value">{{ summary.critical }}</div>
+      </div>
+      <div class="summary-card -info">
+        <div class="label">Execution Time</div>
+        <div class="value">{{ execution_time_seconds }}s</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="server-list">
+    {% for server in servers %}
+    <article class="server-card"
+              data-status="{{ server.status }}"
+              data-search="{{ server.search_blob }}"
+              data-hostname="{{ server.hostname }}"
+              data-ip="{{ server.ip }}"
+              data-cpu="{{ server.cpu.usage_percent if server.cpu else '' }}"
+              data-mem="{{ server.memory.mem_percent if server.memory else '' }}"
+              data-disk-max="{{ server.disk_max_percent }}"
+              data-missing-mounts="{{ server.missing_mounts_str }}"
+              data-missing-processes="{{ server.missing_processes_str }}"
+              data-missing-services="{{ server.missing_services_str }}">
+
+      <div class="server-card__header">
+        <span class="server-card__chevron">&#9654;</span>
+
+        <div class="server-card__identity">
+          <span class="hostname">{{ server.hostname }}</span>
+          <span class="ip">{{ server.ip }}</span>
+        </div>
+
+        <span class="badge -{{ server.status }}"><span class="dot"></span>{{ server.status }}</span>
+
+        <div class="server-card__quickstats">
+          <div class="quickstat">
+            <span class="qs-label">CPU</span>
+            <span class="qs-value">{{ "%.1f"|format(server.cpu.usage_percent) if server.cpu else '--' }}%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Memory</span>
+            <span class="qs-value">{{ "%.1f"|format(server.memory.mem_percent) if server.memory else '--' }}%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Disk</span>
+            <span class="qs-value">{{ "%.1f"|format(server.disk_max_percent) }}%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Uptime</span>
+            <span class="qs-value">{{ server.system_info.uptime if server.system_info else 'n/a' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="server-card__body">
+        <div class="server-card__body-inner">
+
+          {% if not server.ssh_reachable %}
+          <div class="section-title">Connection Error</div>
+          <p style="color:var(--critical); font-family:var(--font-mono); font-size:13px;">
+            {{ server.error or "SSH connection failed." }}
+          </p>
+          {% else %}
+
+          <!-- System Info -->
+          <div>
+            <div class="section-title">System Information</div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Hostname</div><div class="v">{{ server.system_info.hostname }}</div></div>
+              <div class="info-item"><div class="k">IP Address</div><div class="v">{{ server.system_info.ip }}</div></div>
+              <div class="info-item"><div class="k">OS Version</div><div class="v">{{ server.system_info.os_version }}</div></div>
+              <div class="info-item"><div class="k">Kernel Version</div><div class="v">{{ server.system_info.kernel_version }}</div></div>
+              <div class="info-item"><div class="k">Uptime</div><div class="v">{{ server.system_info.uptime }}</div></div>
+              <div class="info-item"><div class="k">Server Time</div><div class="v">{{ server.system_info.current_datetime }}</div></div>
+            </div>
+          </div>
+
+          <!-- CPU -->
+          <div>
+            <div class="section-title">CPU &amp; Load Average</div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">CPU Usage</span>
+              <div class="progress-track">
+                <div class="progress-fill -{{ server.cpu.status }}" style="width: {{ server.cpu.usage_percent }}%;"></div>
+              </div>
+              <span class="progress-value">{{ "%.1f"|format(server.cpu.usage_percent) }}%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Load (1 min)</div><div class="v">{{ server.cpu.load_1 }}</div></div>
+              <div class="info-item"><div class="k">Load (5 min)</div><div class="v">{{ server.cpu.load_5 }}</div></div>
+              <div class="info-item"><div class="k">Load (15 min)</div><div class="v">{{ server.cpu.load_15 }}</div></div>
+              <div class="info-item"><div class="k">CPU Cores</div><div class="v">{{ server.cpu.core_count }}</div></div>
+              <div class="info-item"><div class="k">Load Ratio (1m/core)</div><div class="v">{{ server.cpu.load_ratio }}</div></div>
+            </div>
+          </div>
+
+          <!-- Memory -->
+          <div>
+            <div class="section-title">Memory &amp; Swap</div>
+            <div class="progress-row" style="margin-bottom:8px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Memory</span>
+              <div class="progress-track">
+                <div class="progress-fill -{{ server.memory.status }}" style="width: {{ server.memory.mem_percent }}%;"></div>
+              </div>
+              <span class="progress-value">{{ "%.1f"|format(server.memory.mem_percent) }}%</span>
+            </div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Swap</span>
+              <div class="progress-track">
+                <div class="progress-fill -{{ server.memory.status }}" style="width: {{ server.memory.swap_percent }}%;"></div>
+              </div>
+              <span class="progress-value">{{ "%.1f"|format(server.memory.swap_percent) }}%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Total Memory</div><div class="v">{{ server.memory.mem_total_mb }} MB</div></div>
+              <div class="info-item"><div class="k">Used Memory</div><div class="v">{{ server.memory.mem_used_mb }} MB</div></div>
+              <div class="info-item"><div class="k">Available Memory</div><div class="v">{{ server.memory.mem_available_mb }} MB</div></div>
+              <div class="info-item"><div class="k">Total Swap</div><div class="v">{{ server.memory.swap_total_mb }} MB</div></div>
+              <div class="info-item"><div class="k">Used Swap</div><div class="v">{{ server.memory.swap_used_mb }} MB</div></div>
+            </div>
+          </div>
+
+          <!-- Disk -->
+          <div>
+            <div class="section-title">Disk Usage</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Filesystem</th><th>Mount Point</th><th>Size</th><th>Used</th><th>Available</th><th>Use %</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {% for fs in server.disk.filesystems %}
+                  <tr>
+                    <td class="mono">{{ fs.filesystem }}</td>
+                    <td class="mono">{{ fs.mount_point }}</td>
+                    <td>{{ fs.size }}</td>
+                    <td>{{ fs.used }}</td>
+                    <td>{{ fs.available }}</td>
+                    <td>{{ fs.use_percent }}%</td>
+                    <td><span class="badge -{{ fs.status }}"><span class="dot"></span>{{ fs.status }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="7">No filesystem data available.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Mounts -->
+          <div>
+            <div class="section-title">Mount Point Validation</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Expected Mount</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for mount in server.mounts.mounts %}
+                  <tr>
+                    <td class="mono">{{ mount.mount_point }}</td>
+                    <td>
+                      {% if mount.present %}
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      {% else %}
+                      <span class="badge -critical"><span class="dot"></span>missing</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="2">No expected mounts configured.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Processes -->
+          <div>
+            <div class="section-title">Required Processes</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Process</th><th>PID Count</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for proc in server.processes.processes %}
+                  <tr>
+                    <td class="mono">{{ proc.name }}</td>
+                    <td>{{ proc.pid_count }}</td>
+                    <td>
+                      {% if proc.running %}
+                      <span class="badge -healthy"><span class="dot"></span>running</span>
+                      {% else %}
+                      <span class="badge -warning"><span class="dot"></span>not running</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="3">No expected processes configured.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Services -->
+          <div>
+            <div class="section-title">System Services</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Service</th><th>State</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for svc in server.services.services %}
+                  <tr>
+                    <td class="mono">{{ svc.name }}</td>
+                    <td class="mono">{{ svc.state }}</td>
+                    <td>
+                      {% if svc.active %}
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      {% else %}
+                      <span class="badge -warning"><span class="dot"></span>inactive</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="3">No expected services configured.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="empty-state" id="empty-state">
+    <div class="icon">&#128269;</div>
+    <div>No servers match your search.</div>
+  </div>
+
+  <footer class="page-footer">
+    <span>{{ company_name }} &middot; Linux Server Health Check Automation</span>
+    <span>Report generated {{ generated_at }} &middot; Execution time {{ execution_time_seconds }}s</span>
+  </footer>
+
+</div>
+
+<script>{{ js_content | safe }}</script>
+</body>
+</html>

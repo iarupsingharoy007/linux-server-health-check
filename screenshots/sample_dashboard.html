@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Server Health Check &middot; Acme Infrastructure</title>
+<style>/* ==========================================================================
+   Linux Server Health Check Dashboard
+   Custom stylesheet -- no framework, hand-built.
+
+   Design language: a network operations center (NOC) "vitals monitor".
+   Servers are patients; the dashboard reads their pulse. The signature
+   element is the animated EKG/heartbeat trace running through the
+   summary bar and beside every status badge, colored by fleet health.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* --- Color tokens (dark, default) --- */
+  --bg: #0b1220;
+  --bg-elevated: #0e1729;
+  --surface: #121b2e;
+  --surface-alt: #182541;
+  --border: #243252;
+  --border-soft: #1b2740;
+
+  --text-primary: #e7ecf6;
+  --text-secondary: #b7c0d6;
+  --text-muted: #7c88a6;
+
+  --accent: #5b8def;
+  --accent-soft: rgba(91, 141, 239, 0.14);
+
+  --healthy: #2dd4bf;
+  --healthy-soft: rgba(45, 212, 191, 0.14);
+  --warning: #f5a623;
+  --warning-soft: rgba(245, 166, 35, 0.14);
+  --critical: #f0554a;
+  --critical-soft: rgba(240, 85, 74, 0.15);
+  --unknown: #7c88a6;
+  --unknown-soft: rgba(124, 136, 166, 0.14);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px -12px rgba(0, 0, 0, 0.55);
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+[data-theme="light"] {
+  --bg: #f3f5fa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-alt: #eef1f8;
+  --border: #dde3f0;
+  --border-soft: #e6eaf4;
+
+  --text-primary: #17223d;
+  --text-secondary: #3d4a6b;
+  --text-muted: #6b7797;
+
+  --accent: #3766d6;
+  --accent-soft: rgba(55, 102, 214, 0.1);
+
+  --healthy: #0f9d8e;
+  --healthy-soft: rgba(15, 157, 142, 0.12);
+  --warning: #b9740f;
+  --warning-soft: rgba(185, 116, 15, 0.12);
+  --critical: #c0392f;
+  --critical-soft: rgba(192, 57, 47, 0.12);
+
+  --shadow-card: 0 1px 2px rgba(23, 34, 61, 0.06), 0 10px 24px -14px rgba(23, 34, 61, 0.18);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); margin: 0; letter-spacing: -0.01em; }
+code, .mono { font-family: var(--font-mono); }
+
+a { color: var(--accent); }
+
+::selection { background: var(--accent-soft); }
+
+/* Visible keyboard focus, everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Top navigation (sticky)
+   -------------------------------------------------------------------------- */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 28px;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.topnav .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.brand .brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--healthy);
+  box-shadow: 0 0 0 4px var(--healthy-soft);
+}
+
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.topnav .search-wrap {
+  flex: 1;
+  max-width: 420px;
+  position: relative;
+}
+
+.search-wrap input {
+  width: 100%;
+  padding: 9px 14px 9px 34px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+.search-wrap input:focus { border-color: var(--accent); }
+
+.search-wrap .search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.topnav .actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover { background: var(--border-soft); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn .icon { font-size: 14px; line-height: 1; }
+
+/* --------------------------------------------------------------------------
+   Page shell
+   -------------------------------------------------------------------------- */
+.page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 28px 80px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.page-header h1 { font-size: 26px; font-weight: 700; }
+.page-header .meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Summary cards + signature heartbeat trace
+   -------------------------------------------------------------------------- */
+.summary-bar {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 22px 24px 18px;
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+
+.pulse-track {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.pulse-track svg { width: 200%; height: 100%; }
+
+.pulse-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: pulse-scroll 6s linear infinite;
+}
+
+.pulse-line.-status-critical { stroke: var(--critical); }
+.pulse-line.-status-warning { stroke: var(--warning); }
+.pulse-line.-status-healthy { stroke: var(--healthy); }
+
+@keyframes pulse-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.summary-cards {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-top: 34px;
+}
+
+.summary-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.summary-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+
+.summary-card .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.summary-card .value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.summary-card.-healthy .value { color: var(--healthy); }
+.summary-card.-warning .value { color: var(--warning); }
+.summary-card.-critical .value { color: var(--critical); }
+.summary-card.-info .value { color: var(--accent); }
+
+/* --------------------------------------------------------------------------
+   Status badges
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+.badge.-healthy { background: var(--healthy-soft); color: var(--healthy); }
+.badge.-healthy .dot { background: var(--healthy); }
+.badge.-warning { background: var(--warning-soft); color: var(--warning); }
+.badge.-warning .dot { background: var(--warning); }
+.badge.-critical { background: var(--critical-soft); color: var(--critical); }
+.badge.-critical .dot { background: var(--critical); animation: blip 1.4s ease-in-out infinite; }
+.badge.-unknown { background: var(--unknown-soft); color: var(--unknown); }
+.badge.-unknown .dot { background: var(--unknown); }
+
+@keyframes blip {
+  0%, 100% { box-shadow: 0 0 0 0 var(--critical-soft); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+
+/* --------------------------------------------------------------------------
+   Server cards
+   -------------------------------------------------------------------------- */
+.server-list { display: flex; flex-direction: column; gap: 14px; }
+
+.server-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.server-card.-hidden { display: none; }
+
+.server-card__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.server-card__header:hover { background: var(--surface-alt); }
+
+.server-card__chevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.server-card.-expanded .server-card__chevron { transform: rotate(90deg); }
+
+.server-card__identity { display: flex; flex-direction: column; gap: 3px; min-width: 220px; }
+.server-card__identity .hostname { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.server-card__identity .ip { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+
+.server-card__quickstats {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.quickstat { display: flex; flex-direction: column; align-items: flex-end; min-width: 64px; }
+.quickstat .qs-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.quickstat .qs-value { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; }
+
+.server-card__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  border-top: 1px solid var(--border-soft);
+}
+
+.server-card.-expanded .server-card__body {
+  max-height: 4000px;
+}
+
+.server-card__body-inner { padding: 18px 20px 22px; display: flex; flex-direction: column; gap: 22px; }
+
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title::after { content: ""; flex: 1; height: 1px; background: var(--border-soft); }
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 20px;
+}
+
+.info-grid .info-item .k { font-size: 11px; color: var(--text-muted); }
+.info-grid .info-item .v { font-family: var(--font-mono); font-size: 13px; margin-top: 2px; word-break: break-word; }
+
+/* --------------------------------------------------------------------------
+   Progress bars
+   -------------------------------------------------------------------------- */
+.progress-row { display: flex; align-items: center; gap: 10px; }
+.progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+
+.progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.progress-fill.-healthy { background: var(--healthy); }
+.progress-fill.-warning { background: var(--warning); }
+.progress-fill.-critical { background: var(--critical); }
+
+.progress-value { font-family: var(--font-mono); font-size: 12.5px; min-width: 46px; text-align: right; }
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: var(--radius-md); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  text-align: left;
+  padding: 9px 14px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 9px 14px;
+  border-top: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+
+tbody tr { transition: background 0.12s ease; }
+tbody tr:hover { background: var(--surface-alt); }
+
+td.mono, .cell-mono { font-family: var(--font-mono); font-size: 12.5px; }
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+.page-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Empty search state
+   -------------------------------------------------------------------------- */
+.empty-state {
+  display: none;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state.-visible { display: block; }
+.empty-state .icon { font-size: 32px; margin-bottom: 10px; }
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .topnav { flex-wrap: wrap; }
+  .topnav .search-wrap { order: 3; max-width: 100%; }
+  .server-card__quickstats { gap: 12px; }
+}
+
+@media (max-width: 560px) {
+  .page { padding: 20px 14px 60px; }
+  .summary-cards { grid-template-columns: 1fr 1fr; }
+  .server-card__header { flex-wrap: wrap; }
+  .server-card__quickstats { margin-left: 0; width: 100%; justify-content: space-between; }
+}
+
+/* --------------------------------------------------------------------------
+   Print styles
+   -------------------------------------------------------------------------- */
+@media print {
+  .topnav, .btn, .search-wrap, .server-card__chevron { display: none !important; }
+  body { background: #fff; color: #000; }
+  .server-card__body { max-height: none !important; }
+  .server-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+  .pulse-track { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span>Linux Server Health Check</span>
+  </div>
+  <span class="brand-sub">Acme Infrastructure</span>
+
+  <div class="search-wrap">
+    <span class="search-icon">&#128269;</span>
+    <input type="text" id="server-search" placeholder="Search hostname, IP, OS...">
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="expand-all"><span class="icon">&#8645;</span><span class="label">Expand all</span></button>
+    <button class="btn" id="export-csv"><span class="icon">&#8681;</span><span class="label">Export CSV</span></button>
+    <button class="btn" id="export-pdf"><span class="icon">&#128196;</span><span class="label">Export PDF</span></button>
+    <button class="btn" id="print-report"><span class="icon">&#128424;</span><span class="label">Print</span></button>
+    <button class="btn primary" id="theme-toggle"><span class="icon">&#9728;&#65039;</span><span class="label">Light mode</span></button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <header class="page-header">
+    <div>
+      <h1>Fleet Health Overview</h1>
+      <div class="meta">Generated 2026-07-11 15:32:44 &middot; Overall status:
+        <span class="badge -critical"><span class="dot"></span>CRITICAL</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="summary-bar">
+    <div class="pulse-track">
+      <svg viewBox="0 0 400 46" preserveAspectRatio="none">
+        <path class="pulse-line -status-critical"
+              d="M0,23 L40,23 L52,23 L60,6 L68,40 L76,23 L90,23 L400,23
+                 L440,23 L452,23 L460,6 L468,40 L476,23 L490,23 L800,23" />
+      </svg>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card -info">
+        <div class="label">Total Servers</div>
+        <div class="value">3</div>
+      </div>
+      <div class="summary-card -healthy">
+        <div class="label">Healthy</div>
+        <div class="value">1</div>
+      </div>
+      <div class="summary-card -warning">
+        <div class="label">Warning</div>
+        <div class="value">1</div>
+      </div>
+      <div class="summary-card -critical">
+        <div class="label">Critical</div>
+        <div class="value">1</div>
+      </div>
+      <div class="summary-card -info">
+        <div class="label">Execution Time</div>
+        <div class="value">13.35s</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="server-list">
+    
+    <article class="server-card"
+              data-status="healthy"
+              data-search="web-prod-01 10.0.1.11 ubuntu 22.04.4 lts 5.15.0-113-generic"
+              data-hostname="web-prod-01"
+              data-ip="10.0.1.11"
+              data-cpu="34.2"
+              data-mem="45.0"
+              data-disk-max="75.0"
+              data-missing-mounts="None"
+              data-missing-processes="None"
+              data-missing-services="None">
+
+      <div class="server-card__header">
+        <span class="server-card__chevron">&#9654;</span>
+
+        <div class="server-card__identity">
+          <span class="hostname">web-prod-01</span>
+          <span class="ip">10.0.1.11</span>
+        </div>
+
+        <span class="badge -healthy"><span class="dot"></span>healthy</span>
+
+        <div class="server-card__quickstats">
+          <div class="quickstat">
+            <span class="qs-label">CPU</span>
+            <span class="qs-value">34.2%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Memory</span>
+            <span class="qs-value">45.0%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Disk</span>
+            <span class="qs-value">75.0%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Uptime</span>
+            <span class="qs-value">up 42 days, 6 hours, 18 minutes</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="server-card__body">
+        <div class="server-card__body-inner">
+
+          
+
+          <!-- System Info -->
+          <div>
+            <div class="section-title">System Information</div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Hostname</div><div class="v">web-prod-01</div></div>
+              <div class="info-item"><div class="k">IP Address</div><div class="v">10.0.1.11</div></div>
+              <div class="info-item"><div class="k">OS Version</div><div class="v">Ubuntu 22.04.4 LTS</div></div>
+              <div class="info-item"><div class="k">Kernel Version</div><div class="v">5.15.0-113-generic</div></div>
+              <div class="info-item"><div class="k">Uptime</div><div class="v">up 42 days, 6 hours, 18 minutes</div></div>
+              <div class="info-item"><div class="k">Server Time</div><div class="v">2026-07-11 14:02:11 UTC</div></div>
+            </div>
+          </div>
+
+          <!-- CPU -->
+          <div>
+            <div class="section-title">CPU &amp; Load Average</div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">CPU Usage</span>
+              <div class="progress-track">
+                <div class="progress-fill -healthy" style="width: 34.2%;"></div>
+              </div>
+              <span class="progress-value">34.2%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Load (1 min)</div><div class="v">1.2</div></div>
+              <div class="info-item"><div class="k">Load (5 min)</div><div class="v">1.0</div></div>
+              <div class="info-item"><div class="k">Load (15 min)</div><div class="v">0.9</div></div>
+              <div class="info-item"><div class="k">CPU Cores</div><div class="v">4</div></div>
+              <div class="info-item"><div class="k">Load Ratio (1m/core)</div><div class="v">0.3</div></div>
+            </div>
+          </div>
+
+          <!-- Memory -->
+          <div>
+            <div class="section-title">Memory &amp; Swap</div>
+            <div class="progress-row" style="margin-bottom:8px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Memory</span>
+              <div class="progress-track">
+                <div class="progress-fill -healthy" style="width: 45.0%;"></div>
+              </div>
+              <span class="progress-value">45.0%</span>
+            </div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Swap</span>
+              <div class="progress-track">
+                <div class="progress-fill -healthy" style="width: 0.0%;"></div>
+              </div>
+              <span class="progress-value">0.0%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Total Memory</div><div class="v">16000 MB</div></div>
+              <div class="info-item"><div class="k">Used Memory</div><div class="v">7200 MB</div></div>
+              <div class="info-item"><div class="k">Available Memory</div><div class="v">8800 MB</div></div>
+              <div class="info-item"><div class="k">Total Swap</div><div class="v">2048 MB</div></div>
+              <div class="info-item"><div class="k">Used Swap</div><div class="v">0 MB</div></div>
+            </div>
+          </div>
+
+          <!-- Disk -->
+          <div>
+            <div class="section-title">Disk Usage</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Filesystem</th><th>Mount Point</th><th>Size</th><th>Used</th><th>Available</th><th>Use %</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">/dev/sda1</td>
+                    <td class="mono">/</td>
+                    <td>80G</td>
+                    <td>38G</td>
+                    <td>42G</td>
+                    <td>47.0%</td>
+                    <td><span class="badge -healthy"><span class="dot"></span>healthy</span></td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/dev/sdb1</td>
+                    <td class="mono">/app</td>
+                    <td>200G</td>
+                    <td>150G</td>
+                    <td>50G</td>
+                    <td>75.0%</td>
+                    <td><span class="badge -healthy"><span class="dot"></span>healthy</span></td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Mounts -->
+          <div>
+            <div class="section-title">Mount Point Validation</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Expected Mount</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">/</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/home</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/opt</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/app</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Processes -->
+          <div>
+            <div class="section-title">Required Processes</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Process</th><th>PID Count</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">nginx</td>
+                    <td>3</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>running</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">python</td>
+                    <td>1</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>running</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Services -->
+          <div>
+            <div class="section-title">System Services</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Service</th><th>State</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">sshd</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">cron</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">nginx</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="server-card"
+              data-status="warning"
+              data-search="app-prod-02 10.0.1.12 centos linux 8 4.18.0-425.el8.x86_64"
+              data-hostname="app-prod-02"
+              data-ip="10.0.1.12"
+              data-cpu="78.5"
+              data-mem="78.7"
+              data-disk-max="86.0"
+              data-missing-mounts="None"
+              data-missing-processes="tomcat"
+              data-missing-services="tomcat">
+
+      <div class="server-card__header">
+        <span class="server-card__chevron">&#9654;</span>
+
+        <div class="server-card__identity">
+          <span class="hostname">app-prod-02</span>
+          <span class="ip">10.0.1.12</span>
+        </div>
+
+        <span class="badge -warning"><span class="dot"></span>warning</span>
+
+        <div class="server-card__quickstats">
+          <div class="quickstat">
+            <span class="qs-label">CPU</span>
+            <span class="qs-value">78.5%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Memory</span>
+            <span class="qs-value">78.7%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Disk</span>
+            <span class="qs-value">86.0%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Uptime</span>
+            <span class="qs-value">up 12 days, 3 hours, 45 minutes</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="server-card__body">
+        <div class="server-card__body-inner">
+
+          
+
+          <!-- System Info -->
+          <div>
+            <div class="section-title">System Information</div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Hostname</div><div class="v">app-prod-02</div></div>
+              <div class="info-item"><div class="k">IP Address</div><div class="v">10.0.1.12</div></div>
+              <div class="info-item"><div class="k">OS Version</div><div class="v">CentOS Linux 8</div></div>
+              <div class="info-item"><div class="k">Kernel Version</div><div class="v">4.18.0-425.el8.x86_64</div></div>
+              <div class="info-item"><div class="k">Uptime</div><div class="v">up 12 days, 3 hours, 45 minutes</div></div>
+              <div class="info-item"><div class="k">Server Time</div><div class="v">2026-07-11 14:02:12 UTC</div></div>
+            </div>
+          </div>
+
+          <!-- CPU -->
+          <div>
+            <div class="section-title">CPU &amp; Load Average</div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">CPU Usage</span>
+              <div class="progress-track">
+                <div class="progress-fill -warning" style="width: 78.5%;"></div>
+              </div>
+              <span class="progress-value">78.5%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Load (1 min)</div><div class="v">3.4</div></div>
+              <div class="info-item"><div class="k">Load (5 min)</div><div class="v">2.9</div></div>
+              <div class="info-item"><div class="k">Load (15 min)</div><div class="v">2.1</div></div>
+              <div class="info-item"><div class="k">CPU Cores</div><div class="v">4</div></div>
+              <div class="info-item"><div class="k">Load Ratio (1m/core)</div><div class="v">0.85</div></div>
+            </div>
+          </div>
+
+          <!-- Memory -->
+          <div>
+            <div class="section-title">Memory &amp; Swap</div>
+            <div class="progress-row" style="margin-bottom:8px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Memory</span>
+              <div class="progress-track">
+                <div class="progress-fill -warning" style="width: 78.7%;"></div>
+              </div>
+              <span class="progress-value">78.7%</span>
+            </div>
+            <div class="progress-row" style="margin-bottom:10px;">
+              <span style="width:110px; font-size:12.5px; color:var(--text-muted);">Swap</span>
+              <div class="progress-track">
+                <div class="progress-fill -warning" style="width: 29.3%;"></div>
+              </div>
+              <span class="progress-value">29.3%</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><div class="k">Total Memory</div><div class="v">32000 MB</div></div>
+              <div class="info-item"><div class="k">Used Memory</div><div class="v">25200 MB</div></div>
+              <div class="info-item"><div class="k">Available Memory</div><div class="v">6800 MB</div></div>
+              <div class="info-item"><div class="k">Total Swap</div><div class="v">4096 MB</div></div>
+              <div class="info-item"><div class="k">Used Swap</div><div class="v">1200 MB</div></div>
+            </div>
+          </div>
+
+          <!-- Disk -->
+          <div>
+            <div class="section-title">Disk Usage</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Filesystem</th><th>Mount Point</th><th>Size</th><th>Used</th><th>Available</th><th>Use %</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">/dev/sda1</td>
+                    <td class="mono">/</td>
+                    <td>100G</td>
+                    <td>60G</td>
+                    <td>40G</td>
+                    <td>60.0%</td>
+                    <td><span class="badge -healthy"><span class="dot"></span>healthy</span></td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/dev/sdb1</td>
+                    <td class="mono">/data</td>
+                    <td>500G</td>
+                    <td>430G</td>
+                    <td>70G</td>
+                    <td>86.0%</td>
+                    <td><span class="badge -warning"><span class="dot"></span>warning</span></td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Mounts -->
+          <div>
+            <div class="section-title">Mount Point Validation</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Expected Mount</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">/</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/home</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/opt</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/app</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">/data</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>present</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Processes -->
+          <div>
+            <div class="section-title">Required Processes</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Process</th><th>PID Count</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">java</td>
+                    <td>2</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>running</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">tomcat</td>
+                    <td>0</td>
+                    <td>
+                      
+                      <span class="badge -warning"><span class="dot"></span>not running</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Services -->
+          <div>
+            <div class="section-title">System Services</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Service</th><th>State</th><th>Status</th></tr></thead>
+                <tbody>
+                  
+                  <tr>
+                    <td class="mono">sshd</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">cron</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">tomcat</td>
+                    <td class="mono">inactive</td>
+                    <td>
+                      
+                      <span class="badge -warning"><span class="dot"></span>inactive</span>
+                      
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="mono">docker</td>
+                    <td class="mono">active</td>
+                    <td>
+                      
+                      <span class="badge -healthy"><span class="dot"></span>active</span>
+                      
+                    </td>
+                  </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="server-card"
+              data-status="critical"
+              data-search="db-prod-03 10.0.1.13  "
+              data-hostname="db-prod-03"
+              data-ip="10.0.1.13"
+              data-cpu=""
+              data-mem=""
+              data-disk-max="0.0"
+              data-missing-mounts="None"
+              data-missing-processes="None"
+              data-missing-services="None">
+
+      <div class="server-card__header">
+        <span class="server-card__chevron">&#9654;</span>
+
+        <div class="server-card__identity">
+          <span class="hostname">db-prod-03</span>
+          <span class="ip">10.0.1.13</span>
+        </div>
+
+        <span class="badge -critical"><span class="dot"></span>critical</span>
+
+        <div class="server-card__quickstats">
+          <div class="quickstat">
+            <span class="qs-label">CPU</span>
+            <span class="qs-value">--%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Memory</span>
+            <span class="qs-value">--%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Disk</span>
+            <span class="qs-value">0.0%</span>
+          </div>
+          <div class="quickstat">
+            <span class="qs-label">Uptime</span>
+            <span class="qs-value">n/a</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="server-card__body">
+        <div class="server-card__body-inner">
+
+          
+          <div class="section-title">Connection Error</div>
+          <p style="color:var(--critical); font-family:var(--font-mono); font-size:13px;">
+            Could not connect to db-prod-03 (10.0.1.13): timed out
+          </p>
+          
+        </div>
+      </div>
+    </article>
+    
+  </div>
+
+  <div class="empty-state" id="empty-state">
+    <div class="icon">&#128269;</div>
+    <div>No servers match your search.</div>
+  </div>
+
+  <footer class="page-footer">
+    <span>Acme Infrastructure &middot; Linux Server Health Check Automation</span>
+    <span>Report generated 2026-07-11 15:32:44 &middot; Execution time 13.35s</span>
+  </footer>
+
+</div>
+
+<script>/**
+ * dashboard.js
+ * ============
+ * Client-side interactivity for the Linux Server Health Check dashboard.
+ * No dependencies -- vanilla JS only, since the report is a single
+ * portable HTML file with no build step or server.
+ *
+ * Features implemented:
+ *  - Live search/filter across server cards
+ *  - Collapse / expand individual server sections
+ *  - Dark / light theme toggle (persisted for the session)
+ *  - Export visible data to CSV
+ *  - Export to PDF (via the browser print dialog)
+ *  - Print report
+ *  - Smooth scrolling for in-page navigation
+ */
+
+(function () {
+  'use strict';
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  function init() {
+    setupThemeToggle();
+    setupSearch();
+    setupCollapsibles();
+    setupExportCsv();
+    setupExportPdf();
+    setupPrint();
+    expandFirstCriticalOrWarning();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Theme toggle                                                        */
+  /* ------------------------------------------------------------------ */
+  function setupThemeToggle() {
+    const toggleBtn = document.getElementById('theme-toggle');
+    if (!toggleBtn) return;
+
+    const root = document.documentElement;
+    const stored = sessionStorage_safe_get('hc-theme');
+    if (stored) {
+      root.setAttribute('data-theme', stored);
+      updateThemeIcon(toggleBtn, stored);
+    }
+
+    toggleBtn.addEventListener('click', function () {
+      const current = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      if (next === 'dark') {
+        root.removeAttribute('data-theme');
+      } else {
+        root.setAttribute('data-theme', 'light');
+      }
+      updateThemeIcon(toggleBtn, next);
+      sessionStorage_safe_set('hc-theme', next);
+    });
+  }
+
+  function updateThemeIcon(btn, theme) {
+    const icon = btn.querySelector('.icon');
+    const label = btn.querySelector('.label');
+    if (icon) icon.textContent = theme === 'light' ? '\u{1F319}' : '\u2600\uFE0F';
+    if (label) label.textContent = theme === 'light' ? 'Dark mode' : 'Light mode';
+  }
+
+  // Artifacts/sandboxed contexts may block sessionStorage; fail silently.
+  function sessionStorage_safe_get(key) {
+    try { return sessionStorage.getItem(key); } catch (e) { return null; }
+  }
+  function sessionStorage_safe_set(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (e) { /* no-op */ }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Search / filter                                                     */
+  /* ------------------------------------------------------------------ */
+  function setupSearch() {
+    const input = document.getElementById('server-search');
+    if (!input) return;
+
+    const cards = Array.from(document.querySelectorAll('.server-card'));
+    const emptyState = document.getElementById('empty-state');
+
+    input.addEventListener('input', function () {
+      const query = input.value.trim().toLowerCase();
+      let visibleCount = 0;
+
+      cards.forEach(function (card) {
+        const haystack = card.getAttribute('data-search') || '';
+        const match = haystack.includes(query);
+        card.classList.toggle('-hidden', !match);
+        if (match) visibleCount += 1;
+      });
+
+      if (emptyState) {
+        emptyState.classList.toggle('-visible', visibleCount === 0);
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Collapse / expand                                                   */
+  /* ------------------------------------------------------------------ */
+  function setupCollapsibles() {
+    document.querySelectorAll('.server-card__header').forEach(function (header) {
+      header.addEventListener('click', function () {
+        const card = header.closest('.server-card');
+        card.classList.toggle('-expanded');
+      });
+      header.setAttribute('tabindex', '0');
+      header.setAttribute('role', 'button');
+      header.addEventListener('keydown', function (evt) {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault();
+          header.click();
+        }
+      });
+    });
+
+    const expandAllBtn = document.getElementById('expand-all');
+    if (expandAllBtn) {
+      expandAllBtn.addEventListener('click', function () {
+        const cards = document.querySelectorAll('.server-card');
+        const anyCollapsed = Array.from(cards).some((c) => !c.classList.contains('-expanded'));
+        cards.forEach((c) => c.classList.toggle('-expanded', anyCollapsed));
+        expandAllBtn.querySelector('.label').textContent = anyCollapsed ? 'Collapse all' : 'Expand all';
+      });
+    }
+  }
+
+  function expandFirstCriticalOrWarning() {
+    const priority = document.querySelector('.server-card[data-status="critical"]') ||
+      document.querySelector('.server-card[data-status="warning"]');
+    if (priority) priority.classList.add('-expanded');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* CSV export                                                          */
+  /* ------------------------------------------------------------------ */
+  function setupExportCsv() {
+    const btn = document.getElementById('export-csv');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      const rows = [
+        ['Hostname', 'IP', 'Status', 'CPU %', 'Memory %', 'Disk (worst) %', 'Missing Mounts', 'Missing Processes', 'Missing Services'],
+      ];
+
+      document.querySelectorAll('.server-card').forEach(function (card) {
+        rows.push([
+          card.getAttribute('data-hostname') || '',
+          card.getAttribute('data-ip') || '',
+          card.getAttribute('data-status') || '',
+          card.getAttribute('data-cpu') || '',
+          card.getAttribute('data-mem') || '',
+          card.getAttribute('data-disk-max') || '',
+          card.getAttribute('data-missing-mounts') || '',
+          card.getAttribute('data-missing-processes') || '',
+          card.getAttribute('data-missing-services') || '',
+        ]);
+      });
+
+      const csvContent = rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+      downloadBlob(csvContent, 'text/csv;charset=utf-8;', buildFilename('csv'));
+    });
+  }
+
+  function csvEscape(value) {
+    const str = String(value == null ? '' : value);
+    if (/[",\r\n]/.test(str)) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  function buildFilename(ext) {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `health_report_${stamp}.${ext}`;
+  }
+
+  function downloadBlob(content, mimeType, filename) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* PDF export (browser print-to-PDF) & print                          */
+  /* ------------------------------------------------------------------ */
+  function setupExportPdf() {
+    const btn = document.getElementById('export-pdf');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.server-card').forEach((c) => c.classList.add('-expanded'));
+      window.print();
+    });
+  }
+
+  function setupPrint() {
+    const btn = document.getElementById('print-report');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      window.print();
+    });
+  }
+})();
+</script>
+</body>
+</html>
