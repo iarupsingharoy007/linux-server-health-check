@@ -1,0 +1,34 @@
+{
+  "servers": [
+    {
+      "hostname": "web-prod-01",
+      "ip": "10.0.1.11",
+      "username": "healthcheck",
+      "ssh_key_path": "~/.ssh/id_rsa_healthcheck",
+      "port": 22,
+      "expected_mounts": ["/", "/home", "/opt", "/app"],
+      "expected_processes": ["nginx", "python"],
+      "expected_services": ["sshd", "cron", "nginx"]
+    },
+    {
+      "hostname": "app-prod-02",
+      "ip": "10.0.1.12",
+      "username": "healthcheck",
+      "password": "REPLACE_WITH_SECURE_PASSWORD_OR_USE_SSH_KEY",
+      "port": 22,
+      "expected_mounts": ["/", "/home", "/opt", "/app", "/data"],
+      "expected_processes": ["java", "tomcat"],
+      "expected_services": ["sshd", "cron", "tomcat", "docker"]
+    },
+    {
+      "hostname": "db-prod-03",
+      "ip": "10.0.1.13",
+      "username": "healthcheck",
+      "ssh_key_path": "~/.ssh/id_rsa_healthcheck",
+      "port": 22,
+      "expected_mounts": ["/", "/home", "/data"],
+      "expected_processes": ["mysqld"],
+      "expected_services": ["sshd", "cron", "mysqld"]
+    }
+  ]
+}
